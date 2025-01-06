@@ -1,0 +1,163 @@
+local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/Jext1/HIGHRealms/refs/heads/main/HighRelamsOrion.lua')))()
+
+local Window = OrionLib:MakeWindow({Name = "High Realms", HidePremium = false, SaveConfig = false, ConfigFolder = "OrionTest", IntroEnabled = false})
+
+local Tab2 = Window:MakeTab({
+    Name = "Mob Farm",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+local Tab3 = Window:MakeTab({
+    Name = "Flower Farm",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+local player = game.Players.LocalPlayer
+local teleporting = false
+local farmingFlowers = false
+local selectedWeapon = "Diamond Hammer"
+local selectedMob = nil
+local plantPartNames = {"Poppy", "Meshes/Flower_Poppy_Flower", "Spots", "Flower"}
+local maxIndex = 74
+local indices = {}
+
+for i = 1, maxIndex do
+    table.insert(indices, i)
+end
+
+local function getPartName(mobType)
+    local partNames = {
+        ["Slime"] = "Slime_L_Eye",
+        ["Gizmos"] = "Gizmo.001",
+        ["Scatters"] = "Scatter_L_Arm",
+        ["Muchers"] = "Muncher_Head_New",
+        ["Flamelet"] = "Flamelet_Head.001",
+        ["Spiders"] = "Head_Spider_Small",
+        ["Grimthorn"] = "Cube.001",
+        ["Arachnella"] = "Spider_Boss_Eyes"
+    }
+    return partNames[mobType]
+end
+
+local function getClosestPlant()
+    local closestPlant = nil
+    local closestDistance = math.huge
+    local plantsFolder = game.Workspace:FindFirstChild("Island")
+
+    if plantsFolder then
+        for _, part in pairs(plantsFolder:GetDescendants()) do
+            if part:IsA("BasePart") and table.find(plantPartNames, part.Name) then
+                local distance = (player.Character.HumanoidRootPart.Position - part.Position).Magnitude
+                if distance < closestDistance then
+                    closestPlant = part
+                    closestDistance = distance
+                end
+            end
+        end
+    end
+    return closestPlant, closestDistance
+end
+
+local function teleportToPlant()
+    while farmingFlowers do
+        if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+            repeat wait(0.1) until player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        end
+
+        local plant, distance = getClosestPlant()
+        if plant then
+            player.Character.HumanoidRootPart.CFrame = plant.CFrame * CFrame.new(0, 3, 0)
+        end
+        wait(0.2)
+    end
+end
+
+local function teleportToSelectedMob()
+    local partName = getPartName(selectedMob)
+    if not partName then return end
+
+    while teleporting do
+        if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+            wait(1)
+            continue
+        end
+
+        local mobsFolder = game.Workspace:FindFirstChild("Mobs")
+        if mobsFolder then
+            for _, mob in pairs(mobsFolder:GetChildren()) do
+                if mob:IsA("Model") and mob:FindFirstChild(partName) then
+                    local mobPart = mob[partName]
+                    local mobLookVector = mobPart.CFrame.LookVector
+                    player.Character.HumanoidRootPart.CFrame = mobPart.CFrame * CFrame.new(-mobLookVector.X * 3, 0, -mobLookVector.Z * 3)
+                    break
+                end
+            end
+        end
+        wait(0.3)
+    end
+end
+
+local function attackMobs()
+    local partName = getPartName(selectedMob)
+    if not partName then return end
+
+    while teleporting do
+        local mobsFolder = game.Workspace:FindFirstChild("Mobs")
+        if not mobsFolder then return end
+
+        for _, mob in pairs(mobsFolder:GetChildren()) do
+            if mob:IsA("Model") and mob:FindFirstChild(partName) then
+                local args = {
+                    [1] = selectedWeapon,
+                    [2] = {mob:GetAttribute("UUID") or mob.Name},
+                    [3] = true
+                }
+                game:GetService("ReplicatedStorage").Packages.Knit.Services.MobService.RF.AttackMobs:InvokeServer(unpack(args))
+            end
+        end
+        wait(0.05)
+    end
+end
+
+Tab2:AddDropdown({
+    Name = "Seleccionar Mob",
+    Default = "Ninguno",
+    Options = {"Slime", "Gizmos", "Scatters", "Muchers", "Flamelet", "Spiders", "Grimthorn", "Arachnella"},
+    Callback = function(Value)
+        selectedMob = Value
+    end    
+})
+
+Tab2:AddDropdown({
+    Name = "Seleccionar Arma",
+    Default = "Diamond Hammer",
+    Options = {"Diamond Hammer", "Frostbite Sword", "Wood Sword", "Twilight Sword"},
+    Callback = function(Value)
+        selectedWeapon = Value
+    end    
+})
+
+Tab2:AddToggle({
+    Name = "Mob Farm",
+    Default = false,
+    Callback = function(Value)
+        teleporting = Value
+        if teleporting then
+            spawn(teleportToSelectedMob)
+            spawn(attackMobs)
+        end
+    end    
+})
+
+Tab3:AddToggle({
+    Name = "Flower Farm",
+    Default = false,
+    Callback = function(Value)
+        farmingFlowers = Value
+        if farmingFlowers then
+            spawn(teleportToPlant)
+        end
+    end
+})
